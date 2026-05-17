@@ -42,7 +42,7 @@
             background: #e9f2ff;
         }
         .stat-card .title { font-size: 14px; color: #666; margin-bottom: 5px; }
-        .stat-card .count { font-size: 24px; font-weight: bold; color: #333; }
+        .stat-card .count { font-size: 24px; font-weight: bold; color: #007bff; }
         .flashcard-container {
             width: 100%;
             max-width: 500px;
@@ -104,7 +104,7 @@
             font-weight: bold;
             cursor: pointer;
             color: white;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s, transform 0.1s;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -115,6 +115,7 @@
         .btn-incorrect { background-color: #dc3545; }
         .btn-unknown { background-color: #fd7e14; }
         .btn-action { background-color: #6c757d; }
+        .btn-reset { background-color: #6c5ce7; }
         .keyboard-hint {
             font-size: 12px;
             opacity: 0.7;
@@ -146,6 +147,7 @@
 
     <div class="controls">
         <button class="btn-action" onclick="shuffleCurrentFolder()">🔀 Karıştır</button>
+        <button class="btn-reset" onclick="resetAllData()">🔄 İlerlemeyi Sıfırla</button>
     </div>
 
     <div class="flashcard-container" onclick="flipCard()">
@@ -173,13 +175,20 @@
     </div>
 
     <script>
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        // ======================== SES SİSTEMİ ========================
         let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
 
         function playSound(type) {
             try {
-                if (!audioCtx) audioCtx = new AudioContext();
-                if (audioCtx.state === 'suspended') audioCtx.resume();
+                initAudio();
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.connect(gain);
@@ -189,36 +198,34 @@
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(600, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
-                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.1);
                 } else if (type === 'incorrect') {
-                    osc.type = 'sawtooth';
+                    osc.type = 'triangle';
                     osc.frequency.setValueAtTime(250, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.2);
-                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.2);
                 } else if (type === 'unknown') {
                     osc.type = 'square';
-                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
                     gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.15);
                 }
-            } catch(e) {}
+            } catch(e) { console.log("Ses çalınamadı:", e); }
         }
 
-        const folders = { main: [], correct: [], incorrect: [], unknown: [] };
-        let currentFolder = 'main';
-        let currentIndex = 0;
-        let isFlipped = false;
-
-        // Telefonların hata yapmaması için dizi formatına çevrilmiş A1 Kelimeleri
-        const wordDatabase = [
+        // ======================== VERİ VE HAFIZA SİSTEMİ ========================
+        const STORAGE_KEY = 'a1_word_folders_data';
+        
+        // Temel Kelime Havuzu
+        const originalWords = [
             {tr:"hakkında, yaklaşık",en:"about",pron:"ebaut"},{tr:"üzerinde",en:"above",pron:"ebav"},{tr:"karşıya, karşısında",en:"across",pron:"ekros"},
             {tr:"eylem, hareket",en:"action",pron:"ekşın"},{tr:"etkinlik",en:"activity",pron:"ektiviti"},{tr:"oyuncu (erkek)",en:"actor",pron:"aktör"},
             {tr:"oyuncu (kadın)",en:"actress",pron:"aktris"},{tr:"eklemek",en:"add",pron:"ed"},{tr:"adres",en:"address",pron:"adres"},
@@ -285,7 +292,7 @@
             {tr:"sevgili, canım",en:"dear",pron:"diyır"},{tr:"aralık",en:"December",pron:"disembır"},{tr:"karar vermek",en:"decide",pron:"disayd"},
             {tr:"lezzetli",en:"delicious",pron:"dilişıs"},{tr:"tarif etmek, betimlemek",en:"describe",pron:"diskrayb"},{tr:"tarif, betimleme",en:"description",pron:"diskripşın"},
             {tr:"tasarım, tasarlamak",en:"design",pron:"dizayn"},{tr:"çalışma masası, sıra",en:"desk",pron:"desk"},{tr:"detay, ayrıntı",en:"detail",pron:"diteyl"},
-            {tr:"diyalog",en:"dialogue",pron:"diyalog"},{tr:"sözlük",en:"dictionary",pron:"dikşınari"},{tr:"ölmek",en:"die",pron:"day"},
+            {tr:"diyalog",en:"dialogue",pron:"dialogue"},{tr:"sözlük",en:"dictionary",pron:"dikşınari"},{tr:"ölmek",en:"die",pron:"day"},
             {tr:"diyet, perhiz",en:"diet",pron:"dayet"},{tr:"fark",en:"difference",pron:"difrıns"},{tr:"farklı",en:"different",pron:"difrınt"},
             {tr:"zor",en:"difficult",pron:"difikılt"},{tr:"akşam yemeği",en:"dinner",pron:"dinır"},{tr:"kirli, pis",en:"dirty",pron:"dörti"},
             {tr:"tartışmak, görüşmek",en:"discuss",pron:"diskas"},{tr:"tabak, yemek",en:"dish",pron:"diş"},{tr:"yapmak",en:"do",pron:"du"},
@@ -320,7 +327,7 @@
             {tr:"uçmak, sinek",en:"fly",pron:"flay"},{tr:"takip etmek",en:"follow",pron:"falov"},{tr:"yiyecek, yemek",en:"food",pron:"fuud"},
             {tr:"ayak",en:"foot",pron:"fuut"},{tr:"futbol",en:"football",pron:"futbol"},{tr:"için",en:"for",pron:"for"},
             {tr:"unutmak",en:"forget",pron:"forget"},{tr:"şekil, oluşturmak",en:"form",pron:"form"},{tr:"kırk",en:"forty",pron:"forti"},
-            {tr:"dört",en:"four",pron:"for"},{tr:"on dört",en:"fourteen",pron:"fortiin"},{tr:"dördüncü",en:"fourth",pron:"fort"},
+            {tr:"dört",en:"four",pron:"for"},{tr:"on dörtt",en:"fourteen",pron:"fortiin"},{tr:"dördüncü",en:"fourth",pron:"fort"},
             {tr:"bedava, özgür",en:"free",pron:"frii"},{tr:"cuma",en:"Friday",pron:"fraydey"},{tr:"arkadaş",en:"friend",pron:"frend"},
             {tr:"arkadaş canlısı",en:"friendly",pron:"frendli"},{tr:"-den, -dan",en:"from",pron:"from"},{tr:"ön",en:"front",pron:"front"},
             {tr:"meyve",en:"fruit",pron:"fruut"},{tr:"tam, dolu",en:"full",pron:"ful"},{tr:"eğlence",en:"fun",pron:"fan"},
@@ -366,7 +373,7 @@
             {tr:"yalan söylemek, uzanmak",en:"lie",pron:"lay"},{tr:"hayat, yaşam",en:"life",pron:"layf"},{tr:"ışık, hafif",en:"light",pron:"layt"},
             {tr:"beğenmek, gibi",en:"like",pron:"layk"},{tr:"çizgi, sıra",en:"line",pron:"layn"},{tr:"aslan",en:"lion",pron:"layın"},
             {tr:"liste",en:"list",pron:"list"},{tr:"dinlemek",en:"listen",pron:"lisın"},{tr:"küçük, az",en:"little",pron:"litıl"},
-            {tr:"yaşamak",en:"live",liv:"liv"},{tr:"yerel",en:"local",pron:"lokıl"},{tr:"uzun",en:"long",pron:"long"},
+            {tr:"yaşamak",en:"live",pron:"liv"},{tr:"yerel",en:"local",pron:"lokıl"},{tr:"uzun",en:"long",pron:"long"},
             {tr:"bakmak, görünmek",en:"look",pron:"luk"},{tr:"kaybetmek",en:"lose",pron:"luuz"},{tr:"çok, miktar",en:"lot",pron:"lot"},
             {tr:"sevmek, aşk",en:"love",pron:"lav"},{tr:"öğle yemeği",en:"lunch",pron:"lanç"},{tr:"makine",en:"machine",pron:"meşiin"},
             {tr:"dergi",en:"magazine",pron:"megıziin"},{tr:"ana, temel",en:"main",pron:"meyn"},{tr:"yapmak",en:"make",pron:"meyk"},
@@ -382,8 +389,8 @@
             {tr:"model, manken",en:"model",pron:"modıl"},{tr:"modern, çağdaş",en:"modern",pron:"modırn"},{tr:"an",en:"moment",pron:"momınt"},
             {tr:"pazartesi",en:"Monday",pron:"mandey"},{tr:"para",en:"money",pron:"mani"},{tr:"ay (zaman)",en:"month",pron:"mant"},
             {tr:"daha fazla",en:"more",pron:"mor"},{tr:"sabah",en:"morning",pron:"morning"},{tr:"en çok",en:"most",pron:"most"},
-            {tr:"anne",en:"mother",pron:"madır"},{tr:"daag",en:"mountain",pron:"mauntın"},{tr:"fare",en:"mouse",pron:"maus"},
-            {tr:"agız",en:"mouth",pron:"maut"},{tr:"hareket etmek, taşınmak",en:"move",pron:"muuv"},{tr:"sinema filmi",en:"movie",pron:"muvi"},
+            {tr:"anne",en:"mother",pron:"madır"},{tr:"dağ",en:"mountain",pron:"mauntın"},{tr:"fare",en:"mouse",pron:"maus"},
+            {tr:"ağız",en:"mouth",pron:"maut"},{tr:"hareket etmek, taşınmak",en:"move",pron:"muuv"},{tr:"sinema filmi",en:"movie",pron:"muvi"},
             {tr:"çok",en:"much",pron:"maç"},{tr:"anne",en:"mum",pron:"mam"},{tr:"müze",en:"museum",pron:"myuziyım"},
             {tr:"müzik",en:"music",pron:"myuzik"},{tr:"zorunlu olmak (-malı)",en:"must",pron:"mast"},{tr:"benim",en:"my",pron:"may"},
             {tr:"isim",en:"name",pron:"neym"},{tr:"doğal",en:"natural",pron:"neçırıl"},{tr:"yakın",en:"near",pron:"niyır"},
@@ -403,7 +410,7 @@
             {tr:"soğan",en:"onion",pron:"anyın"},{tr:"çevrim içi",en:"online",pron:"onlayn"},{tr:"sadece, yalnızca",en:"only",pron:"onli"},
             {tr:"açık, açmak",en:"open",pron:"opın"},{tr:"fikir, görüş",en:"opinion",pron:"opinyın"},{tr:"zıt, karşıt",en:"opposite",pron:"opozit"},
             {tr:"veya, ya da",en:"or",pron:"or"},{tr:"portakal, turuncu",en:"orange",pron:"orınc"},{tr:"sipariş, düzen",en:"order",pron:"ordır"},
-            {tr:"diğeri, başka",en:"other",pron:"adır"},{tr:"bizim",en:"our",pron:"avır"},{tr:"dışarı",en:"out",pron:"aut"},
+            {tr:"diğeri, brass",en:"other",pron:"adır"},{tr:"bizim",en:"our",pron:"avır"},{tr:"dışarı",en:"out",pron:"aut"},
             {tr:"dışarısı",en:"outside",pron:"autsayd"},{tr:"üzerinde, bitmiş",en:"over",pron:"ovır"},{tr:"kendi, sahip olmak",en:"own",pron:"ovn"},
             {tr:"sayfa",en:"page",pron:"peyc"},{tr:"boyamak, boya",en:"paint",pron:"peynt"},{tr:"tablo, resim",en:"painting",pron:"peynting"},
             {tr:"çift, eş",en:"pair",pron:"peyır"},{tr:"kağıt",en:"paper",pron:"peypır"},{tr:"paragraf",en:"paragraph",pron:"paragraf"},
@@ -445,7 +452,7 @@
             {tr:"göndermek",en:"send",pron:"send"},{tr:"cümle",en:"sentence",pron:"sentıns"},{tr:"eylül",en:"September",pron:"septembır"},
             {tr:"yedi",en:"seven",pron:"sevın"},{tr:"on yedi",en:"theventeen",pron:"sevıntiin"},{tr:"yetmiş",en:"seventy",pron:"sevınti"},
             {tr:"paylaşmak, pay",en:"share",pron:"şeyr"},{tr:"o (kadın)",en:"she",pron:"şii"},{tr:"koyun",en:"sheep",pron:"şiip"},
-            {tr:"gömlek",en:"shirt",pron:"şört"},{tr:"ayakkabı",en:"shoe",pron:"şuu"},{tr:"dükkan, mağaza",en:"shop",pron:"şop"},
+            {tr:"gömlek",en:"shirt",pron:"şörts"},{tr:"ayakkabı",en:"shoe",pron:"şuu"},{tr:"dükkan, mağaza",en:"shop",pron:"şop"},
             {tr:"alışveriş",en:"shopping",pron:"şoping"},{tr:"kısa",en:"short",pron:"şort"},{tr:"-malı/-meli",en:"should",pron:"şuld"},
             {tr:"göstermek, gösteri",en:"show",pron:"şov"},{tr:"duş",en:"shower",pron:"şavır"},{tr:"hasta",en:"sick",pron:"sik"},
             {tr:"benzer",en:"similar",pron:"similır"},{tr:"şarkı söylemek",en:"sing",pron:"sing"},{tr:"şarkıcı",en:"singer",pron:"singır"},
@@ -512,7 +519,7 @@
             {tr:"kazanmak",en:"win",pron:"vin"},{tr:"pencere",en:"window",pron:"vindov"},{tr:"şarap",en:"wine",pron:"vayn"},
             {tr:"kış",en:"winter",pron:"kış"},{tr:"ile",en:"with",pron:"vit"},{tr:"olmadan, -sız",en:"without",pron:"vidaut"},
             {tr:"kadın",en:"woman",pron:"vumın"},{tr:"harika",en:"wonderful",pron:"vandırful"},{tr:"kelime",en:"word",pron:"vörd"},
-            {tr:"çalışmak, iş",en:"work",pron:"vörk"},{tr:"işçi",en:"worker",pron:"vörkır"},{tr:"dünya",en:"world",pron:"vörld"},
+            {tr:"çalanlar, iş",en:"work",pron:"vörk"},{tr:"işçi",en:"worker",pron:"vörkır"},{tr:"dünya",en:"world",pron:"vörld"},
             {tr:"isterdi",en:"would",pron:"vud"},{tr:"yazmak",en:"write",pron:"rayt"},{tr:"yazar",en:"writer",pron:"raytır"},
             {tr:"yazma, yazı",en:"writing",pron:"rayting"},{tr:"yanlış",en:"wrong",pron:"rong"},{tr:"evet",en:"yeah",pron:"yea"},
             {tr:"yıl",en:"year",pron:"yiyır"},{tr:"sarı",en:"yellow",pron:"yelov"},{tr:"evet",en:"yes",pron:"yes"},
@@ -520,16 +527,43 @@
             {tr:"senin, sizin",en:"your",pron:"yor"},{tr:"kendin",en:"yourself",pron:"yorself"}
         ];
 
-        // Veritabanındaki kelimeleri klasöre yükle
-        wordDatabase.forEach(item => {
-            folders.main.push({ tr: item.tr, en: item.en, pron: item.pron });
-        });
+        let folders = { main: [], correct: [], incorrect: [], unknown: [] };
+        let currentFolder = 'main';
+        let currentIndex = 0;
+        let isFlipped = false;
+
+        // Hafızadan Verileri Yükle (Eğer yoksa orijinal havuzu kur)
+        function loadSavedData() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.main && parsed.correct && parsed.incorrect && parsed.unknown) {
+                        folders = parsed;
+                        return;
+                    }
+                } catch(e) { console.log("Hafıza yüklenirken hata oluştu, sıfırlanıyor."); }
+            }
+            // İlk kez açılıyorsa veya veri bozuksa orijinal listeyi yükle
+            folders = {
+                main: [...originalWords],
+                correct: [],
+                incorrect: [],
+                unknown: []
+            };
+        }
+
+        // İlerlemeyi Tarayıcı Hafızasına Kaydet
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(folders));
+        }
 
         function updateStats() {
             document.getElementById('count-main').innerText = folders.main.length;
             document.getElementById('count-correct').innerText = folders.correct.length;
             document.getElementById('count-incorrect').innerText = folders.incorrect.length;
             document.getElementById('count-unknown').innerText = folders.unknown.length;
+            saveData(); // İstatistik her değiştiğinde otomatik kaydet
         }
 
         window.switchFolder = function(folderName) {
@@ -612,6 +646,19 @@
             showCard();
         };
 
+        window.resetAllData = function() {
+            if (confirm("Tüm ilerlemeniz sıfırlanacak ve kelimeler ana havuza dönecek. Emin misiniz?")) {
+                localStorage.removeItem(STORAGE_KEY);
+                folders = { main: [...originalWords], correct: [], incorrect: [], unknown: [] };
+                currentFolder = 'main';
+                currentIndex = 0;
+                document.querySelectorAll('.stat-card').forEach(card => card.classList.remove('active'));
+                document.getElementById('tab-main').classList.add('active');
+                updateStats();
+                showCard();
+            }
+        };
+
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space') { e.preventDefault(); flipCard(); }
             else if (e.code === 'ArrowRight') { e.preventDefault(); nextCard(); }
@@ -620,6 +667,14 @@
             else if (e.key === '3') moveWord('unknown');
         });
 
+        // Telefonlarda sese izin vermek için ilk tıklamada ses motorunu tetikle
+        document.body.addEventListener('click', function init() {
+            initAudio();
+            document.body.removeEventListener('click', init);
+        });
+
+        // Başlangıç Kurulumu
+        loadSavedData();
         updateStats();
         showCard();
     </script>
