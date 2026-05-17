@@ -532,21 +532,29 @@
         let currentIndex = 0;
         let isFlipped = false;
 
-        // Hafızadan Verileri Yükle (Eğer yoksa orijinal havuzu kur)
+                // Hafızadan Verileri Yükle (DÜZELTİLMİŞ)
         function loadSavedData() {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
                     if (parsed.main && parsed.correct && parsed.incorrect && parsed.unknown) {
+                        // Eğer main boşsa veya kelime yoksa orijinali yükle
+                        if (parsed.main.length === 0 && originalWords.length > 0) {
+                            parsed.main = JSON.parse(JSON.stringify(originalWords));
+                        }
                         folders = parsed;
+                        console.log("Kayıtlı veri yüklendi! Ana havuz:", folders.main.length);
                         return;
                     }
-                } catch(e) { console.log("Hafıza yüklenirken hata oluştu, sıfırlanıyor."); }
+                } catch(e) { 
+                    console.log("Hata:", e); 
+                }
             }
-            // İlk kez açılıyorsa veya veri bozuksa orijinal listeyi yükle
+            // İlk açılış veya veri yoksa
+            console.log("Yeni veri oluşturuluyor. Kelime sayısı:", originalWords.length);
             folders = {
-                main: [...originalWords],
+                main: JSON.parse(JSON.stringify(originalWords)),
                 correct: [],
                 incorrect: [],
                 unknown: []
