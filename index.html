@@ -686,7 +686,12 @@
             document.body.removeEventListener('click', init);
         });
 
-        // Başlangıç Kurulumu
+                // Başlangıç Kurulumu
+        if (originalWords.length === 0) {
+            console.error("Kelime listesi boş!");
+        } else {
+            console.log("Kelime listesi yüklendi:", originalWords.length);
+        }
         loadSavedData();
         updateStats();
         showCard();
