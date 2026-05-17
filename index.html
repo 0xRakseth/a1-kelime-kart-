@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İngilizce Kelime Kartları</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .stats-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            cursor: pointer;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .stat-card.active {
+            border-color: #007bff;
+            background: #e9f2ff;
+        }
+        .stat-card .title { font-size: 14px; color: #666; margin-bottom: 5px; }
+        .stat-card .count { font-size: 24px; font-weight: bold; color: #333; }
+        .flashcard-container {
+            width: 100%;
+            max-width: 500px;
+            height: 300px;
+            perspective: 1000px;
+            cursor: pointer;
+            margin-bottom: 30px;
+        }
+        .flashcard {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .flashcard.flipped {
+            transform: rotateX(180deg);
+        }
+        .face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .front {
+            background: white;
+            border-bottom: 5px solid #007bff;
+        }
+        .back {
+            background: #007bff;
+            color: white;
+            transform: rotateX(180deg);
+        }
+        .word-tr { font-size: 32px; font-weight: bold; }
+        .word-en { font-size: 36px; font-weight: bold; margin-bottom: 15px; }
+        .word-pron { font-size: 20px; opacity: 0.8; font-style: italic; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        button:hover { opacity: 0.8; }
+        button:active { transform: scale(0.98); }
+        .btn-correct { background-color: #28a745; }
+        .btn-incorrect { background-color: #dc3545; }
+        .btn-unknown { background-color: #fd7e14; }
+        .btn-action { background-color: #6c757d; }
+        .keyboard-hint {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="stats-container">
+        <div class="stat-card active" id="tab-main" onclick="switchFolder('main')">
+            <div class="title">Ana Havuz</div>
+            <div class="count" id="count-main">0</div>
+        </div>
+        <div class="stat-card" id="tab-correct" onclick="switchFolder('correct')">
+            <div class="title">Doğrular</div>
+            <div class="count" id="count-correct">0</div>
+        </div>
+        <div class="stat-card" id="tab-incorrect" onclick="switchFolder('incorrect')">
+            <div class="title">Yanlışlar</div>
+            <div class="count" id="count-incorrect">0</div>
+        </div>
+        <div class="stat-card" id="tab-unknown" onclick="switchFolder('unknown')">
+            <div class="title">Bilmediklerim</div>
+            <div class="count" id="count-unknown">0</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-action" onclick="shuffleCurrentFolder()">🔀 Karıştır</button>
+    </div>
+
+    <div class="flashcard-container" onclick="flipCard()">
+        <div class="flashcard" id="card">
+            <div class="face front">
+                <div class="word-tr" id="card-tr">Yükleniyor...</div>
+                <div style="margin-top:20px; font-size:14px; color:#999;">Çevirmek için tıkla (Boşluk)</div>
+            </div>
+            <div class="face back">
+                <div class="word-en" id="card-en">Loading...</div>
+                <div class="word-pron" id="card-pron">[/]</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-correct" onclick="moveWord('correct')">✔️ Doğru (1)</button>
+        <button class="btn-incorrect" onclick="moveWord('incorrect')">❌ Yanlış (2)</button>
+        <button class="btn-unknown" onclick="moveWord('unknown')">❓ Bilmiyorum (3)</button>
+        <button class="btn-action" onclick="nextCard()">⏭️ Sonraki (Sağ Ok)</button>
+    </div>
+
+    <div class="keyboard-hint">
+        Kısayollar: <b>Boşluk</b> = Kartı Çevir | <b>1</b> = Doğru | <b>2</b> = Yanlış | <b>3</b> = Bilmiyorum | <b>Sağ Ok</b> = Geç
+    </div>
+
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function playSound(type) {
+            try {
+                if (!audioCtx) audioCtx = new AudioContext();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                } else if (type === 'incorrect') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.2);
+                } else if (type === 'unknown') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                }
+            } catch(e) {}
+        }
+
+        const folders = { main: [], correct: [], incorrect: [], unknown: [] };
+        let currentFolder = 'main';
+        let currentIndex = 0;
+        let isFlipped = false;
+
+        // Telefonların hata yapmaması için dizi formatına çevrilmiş A1 Kelimeleri
+        const wordDatabase = [
+            {tr:"hakkında, yaklaşık",en:"about",pron:"ebaut"},{tr:"üzerinde",en:"above",pron:"ebav"},{tr:"karşıya, karşısında",en:"across",pron:"ekros"},
+            {tr:"eylem, hareket",en:"action",pron:"ekşın"},{tr:"etkinlik",en:"activity",pron:"ektiviti"},{tr:"oyuncu (erkek)",en:"actor",pron:"aktör"},
+            {tr:"oyuncu (kadın)",en:"actress",pron:"aktris"},{tr:"eklemek",en:"add",pron:"ed"},{tr:"adres",en:"address",pron:"adres"},
+            {tr:"yetişkin",en:"adult",pron:"edalt"},{tr:"tavsiye",en:"advice",pron:"edvays"},{tr:"korkmuş",en:"afraid",pron:"efreyd"},
+            {tr:"sonra",en:"after",pron:"aftır"},{tr:"öğleden sonra",en:"afternoon",pron:"aftırnuun"},{tr:"tekrar",en:"again",pron:"egeyn"},
+            {tr:"yaş",en:"age",pron:"eyc"},{tr:"önce",en:"ago",pron:"ego"},{tr:"aynı fikirde olmak",en:"agree",pron:"egri"},
+            {tr:"hava",en:"air",pron:"eyr"},{tr:"havalimanı",en:"airport",pron:"eyrport"},{tr:"tüm, hepsi",en:"all",pron:"ol"},
+            {tr:"ayrıca",en:"also",pron:"olso"},{tr:"her zaman",en:"always",pron:"olweys"},{tr:"şaşırtıcı",en:"amazing",pron:"emeyzing"},
+            {tr:"ve",en:"and",pron:"end"},{tr:"sinirli",en:"angry",pron:"engri"},{tr:"hayvan",en:"animal",pron:"enimıl"},
+            {tr:"başka, diğeri",en:"another",pron:"enadır"},{tr:"cevap vermek, yanıt",en:"answer",pron:"ensır"},{tr:"hiç, herhangi",en:"any",pron:"eni"},
+            {tr:"hiç kimse, herhangi biri",en:"anyone",pron:"enivan"},{tr:"hiçbir şey, herhangi bir şey",en:"anything",pron:"eniting"},{tr:"daire",en:"apartment",pron:"epartment"},
+            {tr:"elma",en:"apple",pron:"epıl"},{tr:"nisan",en:"April",pron:"eyprıl"},{tr:"alan, bölge",en:"area",pron:"erya"},
+            {tr:"kol",en:"arm",pron:"arm"},{tr:"etrafında, sularında",en:"around",pron:"eraund"},{tr:"varmak",en:"arrive",pron:"erayv"},
+            {tr:"sanat",en:"art",pron:"art"},{tr:"makale, madde",en:"article",pron:"artikıl"},{tr:"sanatçı",en:"artist",pron:"artist"},
+            {tr:"olarak, gibi",en:"as",pron:"ez"},{tr:"sormak, istemek",en:"ask",pron:"ask"},{tr:"-de, -da",en:"at",pron:"et"},
+            {tr:"ağustos",en:"August",pron:"ogust"},{tr:"teyze, hala",en:"aunt",pron:"aant"},{tr:"sonbahar",en:"autumn",pron:"otım"},
+            {tr:"uzak, uzağa",en:"away",pron:"ewey"},{tr:"bebek",en:"baby",pron:"beybi"},{tr:"arka, sırt",en:"back",pron:"bek"},
+            {tr:"kötü",en:"bad",pron:"bed"},{tr:"çanta",en:"bag",pron:"beg"},{tr:"top",en:"ball",pron:"bol"},
+            {tr:"muz",en:"banana",pron:"bınana"},{tr:"bant, müzik grubu",en:"band",pron:"bend"},{tr:"banka",en:"bank",pron:"benk"},
+            {tr:"banyo",en:"bath",pron:"beth"},{tr:"banyo (oda)",en:"bathroom",pron:"bethruum"},{tr:"olmak",en:"be",pron:"bi"},
+            {tr:"sahil, plaj",en:"beach",pron:"biiç"},{tr:"güzel",en:"beautiful",pron:"biyutiful"},{tr:"çünkü",en:"because",pron:"bikoz"},
+            {tr:"haline gelmek, olmak",en:"become",pron:"bikam"},{tr:"yatak",en:"bed",pron:"bed"},{tr:"yatak odası",en:"bedroom",pron:"bedruum"},
+            {tr:"bira",en:"beer",pron:"biyır"},{tr:"önce",en:"before",pron:"bifor"},{tr:"başlamak",en:"begin",pron:"bigin"},
+            {tr:"başlangıç",en:"beginning",pron:"bigining"},{tr:"arkasında",en:"behind",pron:"bihaynd"},{tr:"inanmak",en:"believe",pron:"biliiv"},
+            {tr:"altında",en:"below",pron:"bilov"},{tr:"en iyi",en:"best",pron:"best"},{tr:"daha iyi",en:"better",pron:"betır"},
+            {tr:"arasında",en:"between",pron:"bitviin"},{tr:"bisiklet",en:"bicycle",pron:"baysıkıl"},{tr:"büyük",en:"big",pron:"big"},
+            {tr:"bisiklet",en:"bike",pron:"bayk"},{tr:"fatura, hesap",en:"bill",pron:"bil"},{tr:"kuş",en:"bird",pron:"börd"},
+            {tr:"doğum günü",en:"birthday",pron:"börtdey"},{tr:"siyah",en:"black",pron:"blek"},{tr:"blog, internet günlüğü",en:"blog",pron:"blog"},
+            {tr:"sarışın",en:"blonde",pron:"blond"},{tr:"mavi",en:"blue",pron:"blu"},{tr:"tekne, bot",en:"boat",pron:"bot"},
+            {tr:"vücut",en:"body",pron:"badi"},{tr:"kitap",en:"book",pron:"buk"},{tr:"bot, çizme",en:"boot",pron:"but"},
+            {tr:"sıkılmış",en:"bored",pron:"bord"},{tr:"sıkıcı",en:"boring",pron:"boring"},{tr:"doğmuş",en:"born",pron:"born"},
+            {tr:"her ikisi",en:"both",pron:"bot"},{tr:"şişe",en:"bottle",pron:"batıl"},{tr:"kutu",en:"box",pron:"baks"},
+            {tr:"erkek çocuk",en:"boy",pron:"boy"},{tr:"erkek arkadaş",en:"boyfriend",pron:"boyfrend"},{tr:"ekmek",en:"bread",pron:"bred"},
+            {tr:"kırmak, mola",en:"break",pron:"breyk"},{tr:"kahvaltı",en:"breakfast",pron:"brekfıst"},{tr:"getirmek",en:"bring",pron:"bring"},
+            {tr:"erkek kardeş",en:"brother",pron:"bradır"},{tr:"kahverengi",en:"brown",pron:"bravn"},{tr:"inşa etmek",en:"build",pron:"bild"},
+            {tr:"bina",en:"building",pron:"bilding"},{tr:"otobüs",en:"bus",pron:"bas"},{tr:"iş, işletme",en:"business",pron:"biznıs"},
+            {tr:"meşgul",en:"busy",pron:"bizi"},{tr:"ama, fakat",en:"but",pron:"bat"},{tr:"tereyağı",en:"butter",pron:"batır"},
+            {tr:"satın almak",en:"buy",pron:"bay"},{tr:"tarafından, yanına",en:"by",pron:"bay"},{tr:"hoşça kal",en:"bye",pron:"bay"},
+            {tr:"kafe",en:"cafe",pron:"kafe"},{tr:"kek, pasta",en:"cake",pron:"keyk"},{tr:"aramak, çağırmak",en:"call",pron:"kol"},
+            {tr:"kamera, fotoğraf makinesi",en:"camera",pron:"kemıra"},{tr:"-ebilmek",en:"can",pron:"ken"},{tr:"yapamamak",en:"cannot",pron:"kennot"},
+            {tr:"başkent, sermaye",en:"capital",pron:"kepitıl"},{tr:"araba",en:"car",pron:"kar"},{tr:"kart",en:"card",pron:"kard"},
+            {tr:"kariyer",en:"career",pron:"kariyer"},{tr:"havuç",en:"carrot",pron:"kerıt"},{tr:"taşımak",en:"carry",pron:"keri"},
+            {tr:"kedi",en:"cat",pron:"ket"},{tr:"CD",en:"CD",pron:"sidi"},{tr:"sent",en:"cent",pron:"sent"},
+            {tr:"merkez",en:"centre",pron:"sentır"},{tr:"yüzyıl",en:"century",pron:"sençuri"},{tr:"sandalye",en:"chair",pron:"çeyr"},
+            {tr:"değiştirmek, değişiklik",en:"change",pron:"çeync"},{tr:"çizelge, tablo",en:"chart",pron:"çart"},{tr:"ucuz",en:"cheap",pron:"çiip"},
+            {tr:"kontrol etmek",en:"check",pron:"çek"},{tr:"peynir",en:"cheese",pron:"çiiz"},{tr:"tavuk",en:"chicken",pron:"çikın"},
+            {tr:"çocuk",en:"child",pron:"çayld"},{tr:"çikolata",en:"chocolate",pron:"aklıt"},{tr:"seçmek",en:"choose",pron:"çuuz"},
+            {tr:"sinema",en:"cinema",pron:"sinema"},{tr:"şehir",en:"city",pron:"siti"},{tr:"sınıf, ders",en:"class",pron:"klas"},
+            {tr:"sınıf",en:"classroom",pron:"klasruum"},{tr:"temiz, temizlemek",en:"clean",pron:"kliin"},{tr:"tırmanmak",en:"climb",pron:"klaymb"},
+            {tr:"saat (duvar/masa)",en:"clock",pron:"klok"},{tr:"kapatmak, yakın",en:"close",pron:"kloz"},{tr:"kıyafet",en:"clothes",pron:"kloz"},
+            {tr:"kulüp",en:"club",pron:"klab"},{tr:"mont, kaban",en:"coat",pron:"kot"},{tr:"kahve",en:"coffee",pron:"kafi"},
+            {tr:"soğuk",en:"cold",pron:"kold"},{tr:"üniversite, kolej",en:"college",pron:"kalıc"},{tr:"renk",en:"colour",pron:"kalır"},
+            {tr:"gelmek",en:"come",pron:"kam"},{tr:"yaygın, ortak",en:"common",pron:"kamın"},{tr:"şirket",en:"company",pron:"kampıni"},
+            {tr:"karşılaştırmak",en:"compare",pron:"kompeyr"},{tr:"tamamlamak, tam",en:"complete",pron:"kompliit"},{tr:"bilgisayar",en:"computer",pron:"kompyutır"},
+            {tr:"konser",en:"concert",pron:"kansırt"},{tr:"sohbet, konuşma",en:"conversation",pron:"kanvırseyşın"},{tr:"yemek pişirmek, aşçı",en:"cook",pron:"kuk"},
+            {tr:"yemek pişirme",en:"cooking",pron:"kuking"},{tr:"serin, havalı",en:"cool",pron:"kuul"},{tr:"doğru, düzeltmek",en:"correct",pron:"korekt"},
+            {tr:"maliyet, mal olmak",en:"cost",pron:"kost"},{tr:"-ebilirdi",en:"could",pron:"kud"},{tr:"ülke, köylük alan",en:"country",pron:"kantri"},
+            {tr:"kurs, ders",en:"course",pron:"kors"},{tr:"kuzen",en:"cousin",pron:"kazın"},{tr:"inek",en:"cow",pron:"kav"},
+            {tr:"krema",en:"cream",pron:"kriim"},{tr:"yaratmak, oluşturmak",en:"create",pron:"krieyt"},{tr:"kültür",en:"culture",pron:"kalçır"},
+            {tr:"kupa, fincan",en:"cup",pron:"kap"},{tr:"müşteri",en:"customer",pron:"kastımır"},{tr:"kesmek",en:"cut",pron:"kat"},
+            {tr:"baba",en:"dad",pron:"ded"},{tr:"dans etmek",en:"dance",pron:"dens"},{tr:"dansçı",en:"dancer",pron:"densır"},
+            {tr:"dans etme",en:"dancing",pron:"densing"},{tr:"tehlikeli",en:"dangerous",pron:"dencırıs"},{tr:"karanlık, koyu",en:"dark",pron:"dark"},
+            {tr:"tarih, randevu",en:"date",pron:"deyt"},{tr:"kız evlat",en:"daughter",pron:"dotır"},{tr:"gün",en:"day",pron:"dey"},
+            {tr:"sevgili, canım",en:"dear",pron:"diyır"},{tr:"aralık",en:"December",pron:"disembır"},{tr:"karar vermek",en:"decide",pron:"disayd"},
+            {tr:"lezzetli",en:"delicious",pron:"dilişıs"},{tr:"tarif etmek, betimlemek",en:"describe",pron:"diskrayb"},{tr:"tarif, betimleme",en:"description",pron:"diskripşın"},
+            {tr:"tasarım, tasarlamak",en:"design",pron:"dizayn"},{tr:"çalışma masası, sıra",en:"desk",pron:"desk"},{tr:"detay, ayrıntı",en:"detail",pron:"diteyl"},
+            {tr:"diyalog",en:"dialogue",pron:"diyalog"},{tr:"sözlük",en:"dictionary",pron:"dikşınari"},{tr:"ölmek",en:"die",pron:"day"},
+            {tr:"diyet, perhiz",en:"diet",pron:"dayet"},{tr:"fark",en:"difference",pron:"difrıns"},{tr:"farklı",en:"different",pron:"difrınt"},
+            {tr:"zor",en:"difficult",pron:"difikılt"},{tr:"akşam yemeği",en:"dinner",pron:"dinır"},{tr:"kirli, pis",en:"dirty",pron:"dörti"},
+            {tr:"tartışmak, görüşmek",en:"discuss",pron:"diskas"},{tr:"tabak, yemek",en:"dish",pron:"diş"},{tr:"yapmak",en:"do",pron:"du"},
+            {tr:"doktor",en:"doctor",pron:"doktır"},{tr:"köpek",en:"dog",pron:"dog"},{tr:"dolar",en:"dollar",pron:"dalır"},
+            {tr:"kapı",en:"door",pron:"dor"},{tr:"aşağı",en:"down",pron:"davn"},{tr:"alt kat",en:"downstairs",pron:"davnsteryz"},
+            {tr:"çizmek",en:"draw",pron:"drov"},{tr:"elbise, giyinmek",en:"dress",pron:"dres"},{tr:"içmek, içecek",en:"drink",pron:"drink"},
+            {tr:"sürmek",en:"drive",pron:"drayv"},{tr:"sürücü",en:"driver",pron:"drayvır"},{tr:"sırasında, boyunca",en:"during",pron:"during"},
+            {tr:"DVD",en:"DVD",pron:"dividi"},{tr:"her biri",en:"each",pron:"iiç"},{tr:"kulak",en:"ear",pron:"iyır"},
+            {tr:"erken",en:"early",pron:"örli"},{tr:"doğu",en:"east",pron:"iist"},{tr:"kolay",en:"easy",pron:"iizi"},
+            {tr:"yemek yemek",en:"eat",pron:"iit"},{tr:"yumurta",en:"egg",pron:"eg"},{tr:"sekiz",en:"eight",pron:"eyt"},
+            {tr:"on sekiz",en:"eighteen",pron:"eytiin"},{tr:"seksen",en:"eighty",pron:"eyti"},{tr:"fil",en:"elephant",pron:"elifınt"},
+            {tr:"on bir",en:"eleven",pron:"ilevın"},{tr:"başka",en:"else",pron:"els"},{tr:"e-posta",en:"email",pron:"imeyl"},
+            {tr:"son, bitirmek",en:"end",pron:"end"},{tr:"tadını çıkarmak, zevk almak",en:"enjoy",pron:"injoy"},{tr:"yeterli",en:"enough",pron:"inaf"},
+            {tr:"euro",en:"euro",pron:"yuro"},{tr:"bile, düz",en:"even",pron:"ivın"},{tr:"akşam",en:"evening",pron:"ivning"},
+            {tr:"olay, etkinlik",en:"event",pron:"ivent"},{tr:"hiç, her zaman",en:"ever",pron:"evır"},{tr:"her",en:"every",pron:"evri"},
+            {tr:"herkes",en:"everybody",pron:"evribadi"},{tr:"herkes",en:"everyone",pron:"evrivan"},{tr:"her şey",en:"everything",pron:"evriting"},
+            {tr:"sınav",en:"exam",pron:"igzem"},{tr:"örnek",en:"example",pron:"igzempıl"},{tr:"heyecanlı",en:"excited",pron:"igzaytıd"},
+            {tr:"heyecan verici",en:"exciting",pron:"igzayting"},{tr:"egzersiz, alıştırma",en:"exercise",pron:"egzırsayz"},{tr:"pahalı",en:"expensive",pron:"ikspensiv"},
+            {tr:"açıklamak",en:"explain",pron:"ikspleyn"},{tr:"ekstra, ilave",en:"extra",pron:"ekstra"},{tr:"göz",en:"eye",pron:"ay"},
+            {tr:"yüz, yüzleşmek",en:"face",pron:"feys"},{tr:"gerçek, durum",en:"fact",pron:"fekt"},{tr:"düşmek, sonbahar",en:"fall",pron:"fol"},
+            {tr:"yanlış, sahte",en:"FALSE",pron:"fols"},{tr:"aile",en:"family",pron:"femili"},{tr:"ünlü",en:"famous",pron:"feymıs"},
+            {tr:"harika, fantastik",en:"fantastic",pron:"fentestik"},{tr:"uzak",en:"far",pron:"far"},{tr:"çiftlik",en:"farm",pron:"farm"},
+            {tr:"çiftçi",en:"farmer",pron:"farmır"},{tr:"hızlı",en:"fast",pron:"fest"},{tr:"şişman, yağ",en:"fat",pron:"fet"},
+            {tr:"baba",en:"father",pron:"fadır"},{tr:"favori, gözde",en:"favourite",pron:"feyvırıt"},{tr:"şubat",en:"February",pron:"februari"},
+            {tr:"hissetmek",en:"feel",pron:"fiil"},{tr:"his, duygu",en:"feeling",pron:"fiiling"},{tr:"festival, şenlik",en:"festival",pron:"festivıl"},
+            {tr:"az, birkaç",en:"few",pron:"fiv"},{tr:"on beş",en:"fifteen",pron:"fiftiin"},{tr:"beşinci",en:"fifth",pron:"fift"},
+            {tr:"elli",en:"fifty",pron:"fifti"},{tr:"doldurmak",en:"fill",pron:"fil"},{tr:"film",en:"film",pron:"film"},
+            {tr:"final, son",en:"final",pron:"faynıl"},{tr:"bulmak",en:"find",pron:"faynd"},{tr:"iyi, hoş (para cezası)",en:"fine",pron:"fayn"},
+            {tr:"bitirmek, son",en:"finish",pron:"finiş"},{tr:"ateş, yangın",en:"fire",pron:"fayır"},{tr:"birinci, ilk",en:"first",pron:"först"},
+            {tr:"balık",en:"fish",pron:"fiş"},{tr:"beş",en:"five",pron:"fayv"},{tr:"daire, düz",en:"flat",pron:"flet"},
+            {tr:"uçuş",en:"flight",pron:"flayt"},{tr:"zemin, kat",en:"floor",pron:"flor"},{tr:"çiçek",en:"flower",pron:"flavır"},
+            {tr:"uçmak, sinek",en:"fly",pron:"flay"},{tr:"takip etmek",en:"follow",pron:"falov"},{tr:"yiyecek, yemek",en:"food",pron:"fuud"},
+            {tr:"ayak",en:"foot",pron:"fuut"},{tr:"futbol",en:"football",pron:"futbol"},{tr:"için",en:"for",pron:"for"},
+            {tr:"unutmak",en:"forget",pron:"forget"},{tr:"şekil, oluşturmak",en:"form",pron:"form"},{tr:"kırk",en:"forty",pron:"forti"},
+            {tr:"dört",en:"four",pron:"for"},{tr:"on dört",en:"fourteen",pron:"fortiin"},{tr:"dördüncü",en:"fourth",pron:"fort"},
+            {tr:"bedava, özgür",en:"free",pron:"frii"},{tr:"cuma",en:"Friday",pron:"fraydey"},{tr:"arkadaş",en:"friend",pron:"frend"},
+            {tr:"arkadaş canlısı",en:"friendly",pron:"frendli"},{tr:"-den, -dan",en:"from",pron:"from"},{tr:"ön",en:"front",pron:"front"},
+            {tr:"meyve",en:"fruit",pron:"fruut"},{tr:"tam, dolu",en:"full",pron:"ful"},{tr:"eğlence",en:"fun",pron:"fan"},
+            {tr:"komik, eğlenceli",en:"funny",pron:"fani"},{tr:"gelecek",en:"future",pron:"fyuçır"},{tr:"oyun",en:"game",pron:"geym"},
+            {tr:"bahçe",en:"garden",pron:"gardın"},{tr:"coğrafya",en:"geography",pron:"ciyografi"},{tr:"elde etmek, almak",en:"get",pron:"get"},
+            {tr:"kız",en:"girl",pron:"görl"},{tr:"kız arkadaş",en:"girlfriend",pron:"görlfrend"},{tr:"vermek",en:"give",pron:"giv"},
+            {tr:"bardak, cam",en:"glass",pron:"glas"},{tr:"gitmek",en:"go",pron:"go"},{tr:"iyi",en:"good",pron:"gud"},
+            {tr:"hoşça kal",en:"goodbye",pron:"gudbay"},{tr:"büyükbaba",en:"grandfather",pron:"grendfadır"},{tr:"büyükanne",en:"grandmother",pron:"grendmadır"},
+            {tr:"büyük ebeveyn",en:"grandparent",pron:"grendperınt"},{tr:"harika, mükemmel",en:"great",pron:"greyt"},{tr:"yeşil",en:"green",pron:"griin"},
+            {tr:"gri",en:"grey",pron:"grey"},{tr:"grup",en:"group",pron:"grup"},{tr:"büyümek, yetişmek",en:"grow",pron:"grov"},
+            {tr:"tahmin etmek",en:"guess",pron:"ges"},{tr:"gitar",en:"guitar",pron:"gitar"},{tr:"spor salonu",en:"gym",pron:"cim"},
+            {tr:"saç, kıl",en:"hair",pron:"heyr"},{tr:"yarım, yarı",en:"half",pron:"half"},{tr:"el",en:"hand",pron:"hend"},
+            {tr:"olmak, meydana gelmek",en:"happen",pron:"hepın"},{tr:"mutlu",en:"happy",pron:"hepi"},{tr:"zor, sert",en:"hard",pron:"hard"},
+            {tr:"şapka",en:"hat",pron:"het"},{tr:"nefret etmek",en:"hate",pron:"heyt"},{tr:"sahip olmak",en:"have",pron:"hev"},
+            {tr:"zorunda olmak",en:"have to",pron:"hev tu"},{tr:"o (erkek)",en:"he",pron:"hi"},{tr:"baş, kafa",en:"head",pron:"hed"},
+            {tr:"sağlık",en:"health",pron:"helt"},{tr:"sağlıklı",en:"healthy",pron:"helti"},{tr:"duymak",en:"hear",pron:"hiyır"},
+            {tr:"merhaba",en:"hello",pron:"helo"},{tr:"yardım etmek",en:"help",pron:"help"},{tr:"onun, onu (kadın)",en:"her",pron:"hör"},
+            {tr:"burada, buraya",en:"here",pron:"hiyır"},{tr:"selam, hey",en:"hey",pron:"hey"},{tr:"merhaba",en:"hi",pron:"hay"},
+            {tr:"yüksek",en:"high",pron:"hay"},{tr:"onu, ona (erkek)",en:"him",pron:"him"},{tr:"onun (erkek)",en:"his",pron:"hiz"},
+            {tr:"tarih, geçmiş",en:"history",pron:"histıri"},{tr:"hobi",en:"hobby",pron:"hobi"},{tr:"tatil, bayram",en:"holiday",pron:"holidey"},
+            {tr:"ev",en:"home",pron:"hom"},{tr:"ev ödevi",en:"homework",pron:"homvörk"},{tr:"umut etmek, ummak",en:"hope",pron:"hop"},
+            {tr:"at",en:"horse",pron:"hors"},{tr:"hastane",en:"hospital",pron:"haspitıl"},{tr:"sıcak, acı",en:"hot",pron:"hat"},
+            {tr:"otel",en:"hotel",pron:"hotel"},{tr:"saat (süre)",en:"hour",pron:"avır"},{tr:"ev",en:"house",pron:"haus"},
+            {tr:"nasıl",en:"how",pron:"hav"},{tr:"ancak, bununla birlikte",en:"however",pron:"hawevır"},{tr:"yüz (sayı)",en:"hundred",pron:"handrıd"},
+            {tr:"aç",en:"hungry",pron:"hangri"},{tr:"erkek eş, koca",en:"husband",pron:"hazbınd"},{tr:"ben",en:"I",pron:"ay"},
+            {tr:"internet",en:"Internet",pron:"intörnet"},{tr:"buz",en:"ice",pron:"ays"},{tr:"dondurma",en:"ice cream",pron:"ays kriim"},
+            {tr:"fikir, düşünce",en:"idea",pron:"aydiya"},{tr:"eğer",en:"if",pron:"if"},{tr:"hayal etmek",en:"imagine",pron:"imecin"},
+            {tr:"önemli",en:"important",pron:"importınt"},{tr:"geliştirmek, iyileşmek",en:"improve",pron:"impruv"},{tr:"içinde, içeri",en:"in",pron:"in"},
+            {tr:"içermek, dahil etmek",en:"include",pron:"inklud"},{tr:"bilgi",en:"information",pron:"informeyşın"},{tr:"ilgi, faiz",en:"interest",pron:"intırest"},
+            {tr:"ilgili",en:"interested",pron:"intırestıd"},{tr:"ilginç",en:"interesting",pron:"intıresting"},{tr:"görüşme, röportaj",en:"interview",pron:"intırviyuv"},
+            {tr:"içine",en:"into",pron:"intu"},{tr:"tanıtmak, tanıştırmak",en:"introduce",pron:"introdus"},{tr:"ada",en:"island",pron:"aylınd"},
+            {tr:"o (cansız/hayvan)",en:"it",pron:"it"},{tr:"onun (cansız/hayvan)",en:"its",pron:"its"},{tr:"ceket",en:"jacket",pron:"cekıt"},
+            {tr:"ocak (ayı)",en:"January",pron:"cenuari"},{tr:"kot pantolon",en:"jeans",pron:"ciins"},{tr:"iş, meslek",en:"job",pron:"cob"},
+            {tr:"katılmak, birleşmek",en:"join",pron:"coyn"},{tr:"yolculuk",en:"journey",pron:"cörni"},{tr:"meyve suyu",en:"juice",pron:"cuus"},
+            {tr:"temmuz",en:"July",pron:"culay"},{tr:"haziran",en:"June",pron:"cuun"},{tr:"sadece, henüz",en:"just",pron:"cast"},
+            {tr:"tutmak, saklamak",en:"keep",pron:"kiip"},{tr:"anahtar",en:"key",pron:"kiy"},{tr:"kilometre",en:"kilometre",pron:"kilomitır"},
+            {tr:"tür, nazik",en:"kind",pron:"kaynd"},{tr:"mutfak",en:"kitchen",pron:"kiçın"},{tr:"bilmek, tanımak",en:"know",pron:"nov"},
+            {tr:"kara, arazi",en:"land",pron:"lend"},{tr:"dil, lisan",en:"language",pron:"lengüiç"},{tr:"büyük, geniş",en:"large",pron:"larc"},
+            {tr:"son, geçen",en:"last",pron:"last"},{tr:"geç",en:"late",pron:"leyt"},{tr:"daha sonra",en:"later",pron:"leytır"},
+            {tr:"gülmek",en:"laugh",pron:"laf"},{tr:"öğrenmek",en:"learn",pron:"lörn"},{tr:"ayrılmak, bırakmak",en:"leave",pron:"liiv"},
+            {tr:"sol",en:"left",pron:"left"},{tr:"bacak",en:"leg",pron:"leg"},{tr:"ders",en:"lesson",pron:"lesın"},
+            {tr:"izin vermek",en:"let",pron:"let"},{tr:"mektup, harf",en:"letter",pron:"letır"},{tr:"kütüphane",en:"library",pron:"laybrıri"},
+            {tr:"yalan söylemek, uzanmak",en:"lie",pron:"lay"},{tr:"hayat, yaşam",en:"life",pron:"layf"},{tr:"ışık, hafif",en:"light",pron:"layt"},
+            {tr:"beğenmek, gibi",en:"like",pron:"layk"},{tr:"çizgi, sıra",en:"line",pron:"layn"},{tr:"aslan",en:"lion",pron:"layın"},
+            {tr:"liste",en:"list",pron:"list"},{tr:"dinlemek",en:"listen",pron:"lisın"},{tr:"küçük, az",en:"little",pron:"litıl"},
+            {tr:"yaşamak",en:"live",liv:"liv"},{tr:"yerel",en:"local",pron:"lokıl"},{tr:"uzun",en:"long",pron:"long"},
+            {tr:"bakmak, görünmek",en:"look",pron:"luk"},{tr:"kaybetmek",en:"lose",pron:"luuz"},{tr:"çok, miktar",en:"lot",pron:"lot"},
+            {tr:"sevmek, aşk",en:"love",pron:"lav"},{tr:"öğle yemeği",en:"lunch",pron:"lanç"},{tr:"makine",en:"machine",pron:"meşiin"},
+            {tr:"dergi",en:"magazine",pron:"megıziin"},{tr:"ana, temel",en:"main",pron:"meyn"},{tr:"yapmak",en:"make",pron:"meyk"},
+            {tr:"adam, insan",en:"man",pron:"men"},{tr:"birçok",en:"many",pron:"meni"},{tr:"harita",en:"map",pron:"mep"},
+            {tr:"mart (ayı)",en:"March",pron:"març"},{tr:"market, pazar",en:"market",pron:"markıt"},{tr:"evli",en:"married",pron:"meriyıd"},
+            {tr:"maç, eşleştirmek",en:"match",pron:"meç"},{tr:"mayıs (ayı)",en:"May",pron:"mey"},{tr:"belki",en:"maybe",pron:"meybi"},
+            {tr:"beni, bana",en:"me",pron:"mi"},{tr:"öğün, yemek",en:"meal",pron:"miil"},{tr:"anlamına gelmek, kastetmek",en:"mean",pron:"miin"},
+            {tr:"anlam",en:"meaning",pron:"miining"},{tr:"et",en:"meat",pron:"miit"},{tr:"buluşmak, tanışmak",en:"meet",pron:"meet"},
+            {tr:"toplantı",en:"meeting",pron:"miiting"},{tr:"üye",en:"member",pron:"membır"},{tr:"menü",en:"menu",pron:"menyu"},
+            {tr:"mesaj",en:"message",pron:"mesıc"},{tr:"metre",en:"metre",pron:"mitır"},{tr:"gece yarısı",en:"midnight",pron:"midnayt"},
+            {tr:"mil",en:"mile",pron:"mayl"},{tr:"süt",en:"milk",pron:"milk"},{tr:"milyon",en:"million",pron:"milyın"},
+            {tr:"dakika",en:"minute",pron:"minit"},{tr:"özlemek, kaçırmak",en:"miss",pron:"mis"},{tr:"hata, yanlış",en:"mistake",pron:"misteyk"},
+            {tr:"model, manken",en:"model",pron:"modıl"},{tr:"modern, çağdaş",en:"modern",pron:"modırn"},{tr:"an",en:"moment",pron:"momınt"},
+            {tr:"pazartesi",en:"Monday",pron:"mandey"},{tr:"para",en:"money",pron:"mani"},{tr:"ay (zaman)",en:"month",pron:"mant"},
+            {tr:"daha fazla",en:"more",pron:"mor"},{tr:"sabah",en:"morning",pron:"morning"},{tr:"en çok",en:"most",pron:"most"},
+            {tr:"anne",en:"mother",pron:"madır"},{tr:"daag",en:"mountain",pron:"mauntın"},{tr:"fare",en:"mouse",pron:"maus"},
+            {tr:"agız",en:"mouth",pron:"maut"},{tr:"hareket etmek, taşınmak",en:"move",pron:"muuv"},{tr:"sinema filmi",en:"movie",pron:"muvi"},
+            {tr:"çok",en:"much",pron:"maç"},{tr:"anne",en:"mum",pron:"mam"},{tr:"müze",en:"museum",pron:"myuziyım"},
+            {tr:"müzik",en:"music",pron:"myuzik"},{tr:"zorunlu olmak (-malı)",en:"must",pron:"mast"},{tr:"benim",en:"my",pron:"may"},
+            {tr:"isim",en:"name",pron:"neym"},{tr:"doğal",en:"natural",pron:"neçırıl"},{tr:"yakın",en:"near",pron:"niyır"},
+            {tr:"ihtiyaç duymak",en:"need",pron:"niid"},{tr:"olumsuz, negatif",en:"negative",pron:"negativ"},{tr:"komşu",en:"neighbour",pron:"neybır"},
+            {tr:"asla, hiç",en:"never",pron:"nevır"},{tr:"yeni",en:"new",pron:"niyuv"},{tr:"haberler",en:"news",pron:"niyuvz"},
+            {tr:"gazete",en:"newspaper",pron:"niyuvzpeypır"},{tr:"sonraki",en:"next",pron:"nekst"},{tr:"bitişiğinde, yanında",en:"next to",pron:"nekst tu"},
+            {tr:"hoş, güzel",en:"nice",pron:"nays"},{tr:"gece",en:"night",pron:"nayt"},{tr:"dokuz",en:"nine",pron:"nayn"},
+            {tr:"on dokuz",en:"nineteen",pron:"nayntiin"},{tr:"doksan",en:"ninety",pron:"naynti"},{tr:"hayır, yok",en:"no",pron:"no"},
+            {tr:"hiç kimse",en:"no one",pron:"no van"},{tr:"hiç kimse",en:"nobody",pron:"nobadi"},{tr:"kuzey",en:"north",pron:"nort"},
+            {tr:"burun",en:"nose",pron:"noz"},{tr:"değil (olumsuzluk eki)",en:"not",pron:"not"},{tr:"not, not etmek",en:"note",pron:"not"},
+            {tr:"hiçbir şey",en:"nothing",pron:"nating"},{tr:"kasım",en:"November",pron:"novembır"},{tr:"şimdi",en:"now",pron:"nav"},
+            {tr:"numara, sayı",en:"number",pron:"nambır"},{tr:"hemşire",en:"nurse",pron:"nörs"},{tr:"nesne, itiraz etmek",en:"object",pron:"obcekt"},
+            {tr:"saat (tam saatlerde)",en:"o'clock",pron:"oklok"},{tr:"ekim (ayı)",en:"October",pron:"oktobır"},{tr:"-ın/-in",en:"of",pron:"ov"},
+            {tr:"kapalı, dışarıda",en:"off",pron:"of"},{tr:"ofis, büro",en:"office",pron:"ofis"},{tr:"sık sık",en:"often",pron:"ofın"},
+            {tr:"oh, ah",en:"oh",pron:"oh"},{tr:"tamam",en:"OK",pron:"okey"},{tr:"eski, yaşlı",en:"old",pron:"old"},
+            {tr:"üzerinde",en:"on",pron:"on"},{tr:"bir kere, bir kez",en:"once",pron:"vans"},{tr:"bir",en:"one",pron:"van"},
+            {tr:"soğan",en:"onion",pron:"anyın"},{tr:"çevrim içi",en:"online",pron:"onlayn"},{tr:"sadece, yalnızca",en:"only",pron:"onli"},
+            {tr:"açık, açmak",en:"open",pron:"opın"},{tr:"fikir, görüş",en:"opinion",pron:"opinyın"},{tr:"zıt, karşıt",en:"opposite",pron:"opozit"},
+            {tr:"veya, ya da",en:"or",pron:"or"},{tr:"portakal, turuncu",en:"orange",pron:"orınc"},{tr:"sipariş, düzen",en:"order",pron:"ordır"},
+            {tr:"diğeri, başka",en:"other",pron:"adır"},{tr:"bizim",en:"our",pron:"avır"},{tr:"dışarı",en:"out",pron:"aut"},
+            {tr:"dışarısı",en:"outside",pron:"autsayd"},{tr:"üzerinde, bitmiş",en:"over",pron:"ovır"},{tr:"kendi, sahip olmak",en:"own",pron:"ovn"},
+            {tr:"sayfa",en:"page",pron:"peyc"},{tr:"boyamak, boya",en:"paint",pron:"peynt"},{tr:"tablo, resim",en:"painting",pron:"peynting"},
+            {tr:"çift, eş",en:"pair",pron:"peyır"},{tr:"kağıt",en:"paper",pron:"peypır"},{tr:"paragraf",en:"paragraph",pron:"paragraf"},
+            {tr:"ebeveyn (anne/baba)",en:"parent",pron:"perınt"},{tr:"park, park etmek",en:"park",pron:"park"},{tr:"parça, bölüm",en:"part",pron:"part"},
+            {tr:"partner, ortak",en:"partner",pron:"partnır"},{tr:"parti",en:"party",pron:"parti"},{tr:"pasaport",en:"passport",pron:"pasport"},
+            {tr:"geçmiş",en:"past",pron:"past"},{tr:"ödemek",en:"pay",pron:"pey"},{tr:"tükenmez kalem",en:"pen",pron:"pen"},
+            {tr:"kurşun kalem",en:"pencil",pron:"pensıl"},{tr:"insanlar, halk",en:"people",pron:"piipıl"},{tr:"biber",en:"pepper",pron:"pepır"},
+            {tr:"mükemmel",en:"perfect",pron:"pörfekt"},{tr:"dönem, periyot",en:"period",pron:"piriyıd"},{tr:"kişi",en:"person",pron:"pörsın"},
+            {tr:"kişisel",en:"personal",pron:"pörsınıl"},{tr:"telefon, telefon etmek",en:"phone",pron:"fon"},{tr:"fotoğraf",en:"photo",pron:"foto"},
+            {tr:"fotoğraf",en:"photograph",pron:"fotograf"},{tr:"ifade, sözcük grubu",en:"phrase",pron:"freyz"},{tr:"piyano",en:"piano",pron:"piyano"},
+            {tr:"resim",en:"picture",pron:"pikçır"},{tr:"parça",en:"piece",pron:"piis"},{tr:"domuz",en:"pig",pron:"pig"},
+            {tr:"pembe",en:"pink",pron:"pink"},{tr:"yer, mekan",en:"place",pron:"pleys"},{tr:"plan, tasarlamak",en:"plan",pron:"plen"},
+            {tr:"uçak",en:"plane",pron:"pleyn"},{tr:"bitki, dikmek",en:"plant",pron:"plent"},{tr:"oynamak, çalmak",en:"play",pron:"pley"},
+            {tr:"oyuncu",en:"player",pron:"pleyyır"},{tr:"lütfen",en:"please",pron:"pliiz"},{tr:"nokta, puan",en:"point",pron:"poynt"},
+            {tr:"polis",en:"police",pron:"poliis"},{tr:"polis memuru",en:"policeman",pron:"poliisman"},{tr:"havuz",en:"pool",pron:"puul"},
+            {tr:"fakir, zavallı",en:"poor",pron:"puur"},{tr:"popüler",en:"popular",pron:"papyulır"},{tr:"pozitif, olumlu",en:"positive",pron:"pozitiv"},
+            {tr:"mümkün",en:"possible",pron:"posibıl"},{tr:"posta, postalamak",en:"post",pron:"post"},{tr:"patates",en:"potato",pron:"poteyto"},
+            {tr:"pound",en:"pound",pron:"paund"},{tr:"pratik, uygulama",en:"practice",pron:"prektis"},{tr:"pratik yapmak",en:"practise",pron:"prektis"},
+            {tr:"tercih etmek",en:"prefer",pron:"priför"},{tr:"hazırlamak",en:"prepare",pron:"pripeyr"},{tr:"mevcut, hediye",en:"present",pron:"prezınt"},
+            {tr:"şirin, tatlı",en:"pretty",pron:"priti"},{tr:"fiyat, bedel",en:"price",pron:"prays"},{tr:"muhtemelen",en:"probably",pron:"probabli"},
+            {tr:"problem, sorun",en:"problem",pron:"probılım"},{tr:"ürün",en:"product",pron:"prodakt"},{tr:"program",en:"programme",pron:"program"},
+            {tr:"proje",en:"project",pron:"procekt"},{tr:"mor",en:"purple",pron:"pörpıl"},{tr:"koymak",en:"put",pron:"put"},
+            {tr:"çeyrek",en:"quarter",pron:"kuartır"},{tr:"soru",en:"question",pron:"kuesçın"},{tr:"hızlı, çabuk",en:"quick",pron:"kuik"},
+            {tr:"hızlıca",en:"quickly",pron:"kuikli"},{tr:"sessiz",en:"quiet",pron:"kuayıt"},{tr:"oldukça, epey",en:"quite",pron:"kuayt"},
+            {tr:"radyo",en:"radio",pron:"radyo"},{tr:"yağmur, yağmur yağmak",en:"rain",pron:"reyn"},{tr:"okumak",en:"read",pron:"riid"},
+            {tr:"okuyucu",en:"reader",pron:"riidır"},{tr:"okuma",en:"reading",pron:"riiding"},{tr:"hazır",en:"ready",pron:"redi"},
+            {tr:"gerçek",en:"real",pron:"riyıl"},{tr:"gerçekten",en:"really",pron:"riili"},{tr:"sebep, neden",en:"reason",pron:"riizın"},
+            {tr:"kırmızı",en:"red",pron:"red"},{tr:"rahatlamak",en:"relax",pron:"rileks"},{tr:"hatırlamak",en:"remember",pron:"rimembır"},
+            {tr:"tekrar etmek",en:"repeat",pron:"ripiit"},{tr:"rapor, bildirmek",en:"report",pron:"riport"},{tr:"restoran, lokanta",en:"restaurant",pron:"restorant"},
+            {tr:"sonuç",en:"result",pron:"rizalt"},{tr:"geri dönmek, iade etmek",en:"return",pron:"ritörn"},{tr:"pirinç, pilav",en:"rice",pron:"rays"},
+            {tr:"zengin",en:"rich",pron:"riç"},{tr:"binmek (bisiklet, at)",en:"ride",pron:"rayd"},{tr:"sağ, doğru",en:"right",pron:"rayt"},
+            {tr:"nehir",en:"river",pron:"rivır"},{tr:"yol",en:"road",pron:"rod"},{tr:"oda",en:"room",pron:"ruum"},
+            {tr:"rutin, alışkanlık",en:"routine",pron:"rutiin"},{tr:"kural, yönetmek",en:"rule",pron:"ruul"},{tr:"koşmak, çalıştırmak",en:"run",pron:"ran"},
+            {tr:"üzgün",en:"sad",pron:"sed"},{tr:"salata",en:"salad",pron:"selıd"},{tr:"tuz",en:"salt",pron:"solt"},
+            {tr:"aynı",en:"same",pron:"seym"},{tr:"sandviç",en:"sandwich",pron:"sendviç"},{tr:"cumartesi",en:"Saturday",pron:"satırdey"},
+            {tr:"söylemek",en:"say",pron:"sey"},{tr:"okul",en:"school",pron:"skuul"},{tr:"bilim",en:"science",pron:"sayns"},
+            {tr:"bilim insanı",en:"scientist",pron:"sayntist"},{tr:"deniz",en:"sea",pron:"sii"},{tr:"saniye, ikinci",en:"second",pron:"sekınd"},
+            {tr:"bölüm, kısım",en:"section",pron:"sekşın"},{tr:"görmak",en:"see",pron:"sii"},{tr:"satmak",en:"sell",pron:"sel"},
+            {tr:"göndermek",en:"send",pron:"send"},{tr:"cümle",en:"sentence",pron:"sentıns"},{tr:"eylül",en:"September",pron:"septembır"},
+            {tr:"yedi",en:"seven",pron:"sevın"},{tr:"on yedi",en:"theventeen",pron:"sevıntiin"},{tr:"yetmiş",en:"seventy",pron:"sevınti"},
+            {tr:"paylaşmak, pay",en:"share",pron:"şeyr"},{tr:"o (kadın)",en:"she",pron:"şii"},{tr:"koyun",en:"sheep",pron:"şiip"},
+            {tr:"gömlek",en:"shirt",pron:"şört"},{tr:"ayakkabı",en:"shoe",pron:"şuu"},{tr:"dükkan, mağaza",en:"shop",pron:"şop"},
+            {tr:"alışveriş",en:"shopping",pron:"şoping"},{tr:"kısa",en:"short",pron:"şort"},{tr:"-malı/-meli",en:"should",pron:"şuld"},
+            {tr:"göstermek, gösteri",en:"show",pron:"şov"},{tr:"duş",en:"shower",pron:"şavır"},{tr:"hasta",en:"sick",pron:"sik"},
+            {tr:"benzer",en:"similar",pron:"similır"},{tr:"şarkı söylemek",en:"sing",pron:"sing"},{tr:"şarkıcı",en:"singer",pron:"singır"},
+            {tr:"kız kardeş",en:"sister",pron:"sistır"},{tr:"oturmak",en:"sit",pron:"sit"},{tr:"durum",en:"situation",pron:"siçueyşın"},
+            {tr:"altı",en:"six",pron:"siks"},{tr:"on altı",en:"sixteen",pron:"sikstiin"},{tr:"altmış",en:"sixty",pron:"siksti"},
+            {tr:"beceri, yetenek",en:"skill",pron:"skil"},{tr:"etek",en:"skirt",pron:"skört"},{tr:"uyumak",en:"sleep",pron:"sliip"},
+            {tr:"yavaş",en:"slow",pron:"slov"},{tr:"küçük",en:"small",pron:"smol"},{tr:"yılan",en:"snake",pron:"sneyk"},
+            {tr:"kar, kar yağmak",en:"snow",pron:"snov"},{tr:"bu yüzden, öyle",en:"so",pron:"so"},{tr:"biraz, bazı",en:"some",pron:"sam"},
+            {tr:"birisi",en:"somebody",pron:"sambadi"},{tr:"birisi",en:"someone",pron:"samvan"},{tr:"bir şey",en:"something",pron:"samting"},
+            {tr:"bazen",en:"sometimes",pron:"samtaymz"},{tr:"erkek evlat",en:"son",pron:"san"},{tr:"şarkı",en:"song",pron:"song"},
+            {tr:"yakında",en:"soon",pron:"suun"},{tr:"üzgün, özür dilerim",en:"sorry",pron:"sori"},{tr:"ses",en:"sound",pron:"saund"},
+            {tr:"çorba",en:"soup",pron:"suup"},{tr:"güney",en:"south",pron:"saut"},{tr:"uzay, boşluk",en:"space",pron:"speys"},
+            {tr:"konuşmak",en:"speak",pron:"spiik"},{tr:"özel",en:"special",pron:"speşıl"},{tr:"hecelemek",en:"spell",pron:"spel"},
+            {tr:"yazım, imla",en:"spelling",pron:"speling"},{tr:"harcamak, geçirmek",en:"spend",pron:"spend"},{tr:"spor",en:"sport",pron:"sport"},
+            {tr:"ilkbahar",en:"spring",pron:"spring"},{tr:"ayakta durmak",en:"stand",pron:"stend"},{tr:"yıldız",en:"star",pron:"star"},
+            {tr:"başlamak",en:"start",pron:"start"},{tr:"ifade, beyan",en:"statement",pron:"steytmınt"},{tr:"istasyon",en:"station",pron:"steyşın"},
+            {tr:"kalmak",en:"stay",pron:"stey"},{tr:"hala, hareketsiz",en:"still",pron:"stil"},{tr:"durmak",en:"stop",pron:"stop"},
+            {tr:"hikaye",en:"story",pron:"stori"},{tr:"sokak",en:"street",pron:"striit"},{tr:"güçlü",en:"strong",pron:"strong"},
+            {tr:"öğrenci",en:"student",pron:"styudınt"},{tr:"çalışmak, incelemek",en:"study",pron:"stadi"},{tr:"tarz, stil",en:"style",pron:"stayl"},
+            {tr:"konu, ders",en:"subject",pron:"sabcekt"},{tr:"başarı",en:"success",pron:"sakses"},{tr:"şeker",en:"sugar",pron:"şugır"},
+            {tr:"yaz",en:"summer",pron:"samır"},{tr:"güneş",en:"sun",pron:"san"},{tr:"pazar (günü)",en:"Sunday",pron:"sandey"},
+            {tr:"süpermarket",en:"supermarket",pron:"supırmarkıt"},{tr:"emin, elbette",en:"sure",pron:"şuur"},{tr:"kazak, süveter",en:"sweater",pron:"svetır"},
+            {tr:"yüzmek",en:"swim",pron:"svim"},{tr:"yüzme",en:"swimming",pron:"sviming"},{tr:"masa, tablo",en:"table",pron:"teybıl"},
+            {tr:"almak, götürmek",en:"take",pron:"teyk"},{tr:"konuşmak",en:"talk",pron:"tolk"},{tr:"uzun (boy)",en:"tall",pron:"tol"},
+            {tr:"taksi",en:"taxi",pron:"taksi"},{tr:"çay",en:"tea",pron:"tii"},{tr:"öğretmek",en:"teach",pron:"tiiç"},
+            {tr:"öğretmen",en:"teacher",pron:"tiiçır"},{tr:"takım, ekip",en:"team",pron:"tiim"},{tr:"ergen, genç",en:"teenager",pron:"tiineycır"},
+            {tr:"telefon",en:"telephone",pron:"telifon"},{tr:"televizyon",en:"television",pron:"telivijın"},{tr:"anlatmak, söylemek",en:"tell",pron:"tel"},
+            {tr:"on",en:"ten",pron:"ten"},{tr:"tenis",en:"tennis",pron:"tenis"},{tr:"berbat, korkunç",en:"terrible",pron:"teribıl"},
+            {tr:"test, denemek",en:"test",pron:"test"},{tr:"metin",en:"text",pron:"tekst"},{tr:"-den/-dan",en:"than",pron:"den"},
+            {tr:"teşekkür etmek",en:"thank",pron:"tenk"},{tr:"teşekkürler",en:"thanks",pron:"tenks"},{tr:"şu, o",en:"that",pron:"det"},
+            {tr:"tiyatır",en:"theatre",pron:"tiyatır"},{tr:"onların",en:"their",pron:"deyır"},{tr:"onları, onlara",en:"them",pron:"dem"},
+            {tr:"o zaman, sonra",en:"then",pron:"den"},{tr:"orada, oraya",en:"there",pron:"der"},{tr:"onlar",en:"they",pron:"dey"},
+            {tr:"şey, nesne",en:"thing",pron:"ting"},{tr:"düşünmek",en:"think",pron:"tink"},{tr:"üçüncü",en:"third",pron:"törd"},
+            {tr:"susamış",en:"thirsty",pron:"törsti"},{tr:"on üç",en:"thirteen",pron:"törtiin"},{tr:"otuz",en:"thirty",pron:"törti"},
+            {tr:"bu",en:"this",pron:"dis"},{tr:"bin (sayı)",en:"thousand",pron:"tauzınd"},{tr:"üç",en:"three",pron:"tri"},
+            {tr:"içinden, aracılığıyla",en:"through",pron:"tru"},{tr:"perşembe",en:"Thursday",pron:"törzdey"},{tr:"bilet",en:"ticket",pron:"tikıt"},
+            {tr:"zaman, kez",en:"time",pron:"taym"},{tr:"yorgun",en:"tired",pron:"tayrıt"},{tr:"başlık, unvan",en:"title",pron:"taytıl"},
+            {tr:"-e/-a yönelme",en:"to",pron:"tu"},{tr:"bugün",en:"today",pron:"tudey"},{tr:"birlikte",en:"together",pron:"togedır"},
+            {tr:"tuvalet",en:"toilet",pron:"toylıt"},{tr:"domates",en:"tomato",pron:"tomeyto"},{tr:"yarın",en:"tomorrow",pron:"tumorov"},
+            {tr:"bu gece",en:"tonight",pron:"tunayt"},{tr:"çok, ayrıca",en:"too",pron:"tuu"},{tr:"diş",en:"tooth",pron:"tuut"},
+            {tr:"konu",en:"topic",pron:"topik"},{tr:"turist",en:"tourist",pron:"turist"},{tr:"kasaba, şehir",en:"town",pron:"tavn"},
+            {tr:"trafik",en:"traffic",pron:"trafik"},{tr:"tren, eğitmek",en:"train",pron:"treyn"},{tr:"seyahat etmek",en:"travel",pron:"trevıl"},
+            {tr:"ağaç",en:"tree",pron:"trii"},{tr:"gezi, yolculuk",en:"trip",pron:"trip"},{tr:"pantolon",en:"trousers",pron:"trauzırs"},
+            {tr:"doğru, gerçek",en:"TRUE",pron:"tru"},{tr:"denemek",en:"try",pron:"tray"},{tr:"tişört",en:"T-shirt",pron:"tişört"},
+            {tr:"salı",en:"Tuesday",pron:"tyuzdey"},{tr:"dönmek, sıra",en:"turn",pron:"törn"},{tr:"televizyon",en:"TV",pron:"tivi"},
+            {tr:"on iki",en:"twelve",pron:"tuelv"},{tr:"yirmi",en:"twenty",pron:"tuenti"},{tr:"iki kez",en:"twice",pron:"tuays"},
+            {tr:"iki",en:"two",pron:"tu"},{tr:"tür, yazmak",en:"type",pron:"tayp"},{tr:"şemsiye",en:"umbrella",pron:"ambırela"},
+            {tr:"amca, dayı",en:"uncle",pron:"ankıl"},{tr:"altında",en:"under",pron:"andır"},{tr:"anlamak",en:"understand",pron:"andırstend"},
+            {tr:"üniversite",en:"university",pron:"yunivörsiti"},{tr:"-e kadar",en:"until",pron:"antil"},{tr:"yukarı",en:"up",pron:"ap"},
+            {tr:"üst kat",en:"upstairs",pron:"upsteryz"},{tr:"bizi, bize",en:"us",pron:"as"},{tr:"kullanmak",en:"use",pron:"yuuz"},
+            {tr:"faydalı",en:"useful",pron:"yuusful"},{tr:"genellikle",en:"usually",pron:"yujıli"},{tr:"tatil",en:"vacation",pron:"vekeyşın"},
+            {tr:"sebze",en:"vegetable",pron:"vecıtıbıl"},{tr:"çok",en:"very",pron:"veri"},{tr:"video",en:"video",pron:"viidyo"},
+            {tr:"köy",en:"village",pron:"vilıc"},{tr:"ziyaret etmek",en:"visit",pron:"vizit"},{tr:"ziyaretçi",en:"visitor",pron:"vizitır"},
+            {tr:"beklemek",en:"wait",pron:"veyt"},{tr:"garson",en:"waiter",pron:"veytır"},{tr:"uyanmak",en:"wake",pron:"veyk"},
+            {tr:"yürümek",en:"walk",pron:"volk"},{tr:"duvar",en:"wall",pron:"vol"},{tr:"istemek",en:"want",pron:"vont"},
+            {tr:"ılık, sıcak",en:"warm",pron:"vorm"},{tr:"yıkamak",en:"wash",pron:"voş"},{tr:"izlemek, saat",en:"watch",pron:"voç"},
+            {tr:"su",en:"water",pron:"votır"},{tr:"yol, yöntem",en:"way",pron:"vey"},{tr:"biz",en:"we",pron:"vi"},
+            {tr:"giymek",en:"wear",pron:"veyır"},{tr:"hava durumu",en:"weather",pron:"vedır"},{tr:"web sitesi",en:"website",pron:"vebsayt"},
+            {tr:"çarşamba",en:"Wednesday",pron:"venzdey"},{tr:"hafta",en:"week",pron:"viik"},{tr:"hafta sonu",en:"weekend",pron:"viikend"},
+            {tr:"hoş geldiniz",en:"welcome",pron:"velkım"},{tr:"iyi",en:"well",pron:"vel"},{tr:"batı",en:"west",pron:"vest"},
+            {tr:"ne",en:"what",pron:"vat"},{tr:"ne zaman",en:"when",pron:"ven"},{tr:"nerede, nereye",en:"where",pron:"ver"},
+            {tr:"hangi",en:"which",pron:"viç"},{tr:"beyaz",en:"white",pron:"vayt"},{tr:"kim",en:"who",pron:"hu"},
+            {tr:"neden, niçin",en:"why",pron:"vay"},{tr:"eş (kadın)",en:"wife",pron:"vayf"},{tr:"irade",en:"will",pron:"vil"},
+            {tr:"kazanmak",en:"win",pron:"vin"},{tr:"pencere",en:"window",pron:"vindov"},{tr:"şarap",en:"wine",pron:"vayn"},
+            {tr:"kış",en:"winter",pron:"kış"},{tr:"ile",en:"with",pron:"vit"},{tr:"olmadan, -sız",en:"without",pron:"vidaut"},
+            {tr:"kadın",en:"woman",pron:"vumın"},{tr:"harika",en:"wonderful",pron:"vandırful"},{tr:"kelime",en:"word",pron:"vörd"},
+            {tr:"çalışmak, iş",en:"work",pron:"vörk"},{tr:"işçi",en:"worker",pron:"vörkır"},{tr:"dünya",en:"world",pron:"vörld"},
+            {tr:"isterdi",en:"would",pron:"vud"},{tr:"yazmak",en:"write",pron:"rayt"},{tr:"yazar",en:"writer",pron:"raytır"},
+            {tr:"yazma, yazı",en:"writing",pron:"rayting"},{tr:"yanlış",en:"wrong",pron:"rong"},{tr:"evet",en:"yeah",pron:"yea"},
+            {tr:"yıl",en:"year",pron:"yiyır"},{tr:"sarı",en:"yellow",pron:"yelov"},{tr:"evet",en:"yes",pron:"yes"},
+            {tr:"dün",en:"yesterday",pron:"yestırdey"},{tr:"sen, siz",en:"you",pron:"yu"},{tr:"genç",en:"young",pron:"yang"},
+            {tr:"senin, sizin",en:"your",pron:"yor"},{tr:"kendin",en:"yourself",pron:"yorself"}
+        ];
+
+        // Veritabanındaki kelimeleri klasöre yükle
+        wordDatabase.forEach(item => {
+            folders.main.push({ tr: item.tr, en: item.en, pron: item.pron });
+        });
+
+        function updateStats() {
+            document.getElementById('count-main').innerText = folders.main.length;
+            document.getElementById('count-correct').innerText = folders.correct.length;
+            document.getElementById('count-incorrect').innerText = folders.incorrect.length;
+            document.getElementById('count-unknown').innerText = folders.unknown.length;
+        }
+
+        window.switchFolder = function(folderName) {
+            currentFolder = folderName;
+            currentIndex = 0;
+            document.querySelectorAll('.stat-card').forEach(card => card.classList.remove('active'));
+            document.getElementById(`tab-${folderName}`).classList.add('active');
+            showCard();
+        };
+
+        function showCard() {
+            isFlipped = false;
+            const card = document.getElementById('card');
+            card.style.transition = 'none';
+            card.classList.remove('flipped');
+            
+            const list = folders[currentFolder];
+            if (list.length === 0) {
+                document.getElementById('card-tr').innerText = "Klasör Boş!";
+                document.getElementById('card-en').innerText = "";
+                document.getElementById('card-pron').innerText = "";
+                return;
+            }
+
+            if (currentIndex >= list.length) currentIndex = 0;
+            const word = list[currentIndex];
+            document.getElementById('card-tr').innerText = word.tr;
+            document.getElementById('card-en').innerText = word.en;
+            document.getElementById('card-pron').innerText = `[${word.pron}]`;
+
+            setTimeout(() => {
+                card.style.transition = 'transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1)';
+            }, 50);
+        }
+
+        window.flipCard = function() {
+            const list = folders[currentFolder];
+            if (list.length === 0) return;
+            isFlipped = !isFlipped;
+            if (isFlipped) {
+                document.getElementById('card').classList.add('flipped');
+            } else {
+                document.getElementById('card').classList.remove('flipped');
+            }
+        };
+
+        window.nextCard = function() {
+            const list = folders[currentFolder];
+            if (list.length <= 1) return;
+            currentIndex++;
+            if (currentIndex >= list.length) currentIndex = 0;
+            showCard();
+        };
+
+        window.shuffleCurrentFolder = function() {
+            let list = folders[currentFolder];
+            for (let i = list.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [list[i], list[j]] = [list[j], list[i]];
+            }
+            currentIndex = 0;
+            showCard();
+        };
+
+        window.moveWord = function(targetFolder) {
+            const list = folders[currentFolder];
+            if (list.length === 0) return;
+
+            playSound(targetFolder);
+
+            if (currentFolder === targetFolder) {
+                nextCard();
+                return;
+            }
+
+            const word = list.splice(currentIndex, 1)[0];
+            folders[targetFolder].push(word);
+            updateStats();
+            if (currentIndex >= list.length) currentIndex = 0;
+            showCard();
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') { e.preventDefault(); flipCard(); }
+            else if (e.code === 'ArrowRight') { e.preventDefault(); nextCard(); }
+            else if (e.key === '1') moveWord('correct');
+            else if (e.key === '2') moveWord('incorrect');
+            else if (e.key === '3') moveWord('unknown');
+        });
+
+        updateStats();
+        showCard();
+    </script>
+</body>
+</html>
