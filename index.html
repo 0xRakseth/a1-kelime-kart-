@@ -654,12 +654,17 @@
             showCard();
         };
 
-        window.resetAllData = function() {
-            if (confirm("Tüm ilerlemeniz sıfırlanacak ve kelimeler ana havuza dönecek. Emin misiniz?")) {
-                localStorage.removeItem(STORAGE_KEY);
-                folders = { main: [...originalWords], correct: [], incorrect: [], unknown: [] };
+                window.resetAllData = function() {
+            if (confirm("Tüm ilerlemeniz sıfırlanacak. Emin misiniz?")) {
+                folders = {
+                    main: JSON.parse(JSON.stringify(originalWords)),
+                    correct: [],
+                    incorrect: [],
+                    unknown: []
+                };
                 currentFolder = 'main';
                 currentIndex = 0;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(folders)); // Direkt kaydet
                 document.querySelectorAll('.stat-card').forEach(card => card.classList.remove('active'));
                 document.getElementById('tab-main').classList.add('active');
                 updateStats();
